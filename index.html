@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cyber Tetris</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700;800&family=Pretendard:wght@400;600;700&display=swap');
+
+    body {
+      font-family: 'Pretendard', sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      background: radial-gradient(circle at 50% 20%, #151a30 0%, #080a14 100%);
+    }
+
+    .retro-font {
+      font-family: 'Chakra Petch', monospace;
+    }
+
+    /* 네온 글로우 테두리 효과 */
+    .neon-panel {
+      background: rgba(13, 17, 34, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.15), inset 0 0 10px rgba(56, 189, 248, 0.05);
+      backdrop-filter: blur(10px);
+    }
+
+    .neon-border-board {
+      border: 2px solid rgba(56, 189, 248, 0.6);
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.25), inset 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+
+    /* 터치 버튼 피드백 애니메이션 */
+    .ctrl-btn {
+      touch-action: manipulation;
+      transition: all 0.08s ease;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .ctrl-btn:active {
+      transform: scale(0.92);
+      background: rgba(56, 189, 248, 0.4);
+      border-color: rgba(56, 189, 248, 0.8);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+    }
+
+    /* 스크롤 방지 */
+    html, body {
+      overflow-x: hidden;
+      overscroll-behavior: none;
+    }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 select-none">
+  <header class="w-full max-w-4xl flex items-center justify-between px-2 sm:px-4 py-2">
+    <div class="flex items-center gap-2">
+      <div class="w-3 h-8 bg-cyan-400 shadow-[0_0_10px_#22d3ee] rounded-xs"></div>
+      <h1 class="text-xl sm:text-2xl font-black tracking-wider retro-font text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400">
+        CYBER TETRIS
+      </h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="soundToggleBtn" onclick="toggleAudio()" class="w-9 h-9 rounded-lg neon-panel flex items-center justify-center text-cyan-400 hover:text-cyan-300 active:scale-95 transition" title="사운드 켜기/끄기">
+        <i id="soundIcon" class="fa-solid fa-volume-high"></i>
+      </button>
+      <button id="pauseBtn" onclick="togglePause()" class="w-9 h-9 rounded-lg neon-panel flex items-center justify-center text-cyan-400 hover:text-cyan-300 active:scale-95 transition" title="일시정지 (P)">
+        <i id="pauseIcon" class="fa-solid fa-pause"></i>
+      </button>
+      <button onclick="resetGame()" class="w-9 h-9 rounded-lg neon-panel flex items-center justify-center text-cyan-400 hover:text-cyan-300 active:scale-95 transition" title="새 게임 (R)">
+        <i class="fa-solid fa-rotate-right"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-4xl flex flex-1 items-center justify-center py-1 sm:py-2">
+    <div class="flex flex-row items-start justify-center gap-2 sm:gap-4 md:gap-6">
+      
+      <!-- 좌측 패널 (HOLD 및 상태 통계) -->
+      <div class="flex flex-col gap-2 sm:gap-3 w-20 sm:w-28 md:w-36">
+        <!-- HOLD 패널 -->
+        <div class="neon-panel rounded-xl p-2 sm:p-3 flex flex-col items-center">
+          <span class="text-[10px] sm:text-xs font-bold tracking-widest text-cyan-300/80 mb-1">HOLD [C]</span>
+          <canvas id="holdCanvas" width="96" height="96" class="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-slate-950/60 rounded-lg border border-slate-800"></canvas>
+        </div>
+
+        <!-- 점수 패널 -->
+        <div class="neon-panel rounded-xl p-2 sm:p-3 flex flex-col">
+          <span class="text-[10px] sm:text-xs font-semibold text-slate-400">SCORE</span>
+          <span id="scoreText" class="retro-font text-sm sm:text-lg md:text-xl font-bold text-amber-300 truncate">0</span>
+        </div>
+
+        <!-- 레벨 & 라인 수 -->
+        <div class="neon-panel rounded-xl p-2 sm:p-3 flex flex-col">
+          <span class="text-[10px] sm:text-xs font-semibold text-slate-400">LEVEL</span>
+          <span id="levelText" class="retro-font text-sm sm:text-lg md:text-xl font-bold text-emerald-400">1</span>
+          
+          <div class="mt-2 pt-2 border-t border-slate-700/60">
+            <span class="text-[10px] sm:text-xs font-semibold text-slate-400">LINES</span>
+            <span id="linesText" class="retro-font text-sm sm:text-lg md:text-xl font-bold text-cyan-400">0</span>
+          </div>
+        </div>
+
+        <!-- 최고 기록 -->
+        <div class="neon-panel rounded-xl p-2 sm:p-3 flex flex-col">
+          <span class="text-[10px] sm:text-xs font-semibold text-slate-400">TOP SCORE</span>
+          <span id="highScoreText" class="retro-font text-xs sm:text-sm md:text-base font-bold text-fuchsia-400 truncate">0</span>
+        </div>
+      </div>
+
+      <!-- 중앙 메인 보드 캔버스 컨테이너 -->
+      <div class="relative flex flex-col items-center">
+        <div class="neon-border-board rounded-lg p-0.5 sm:p-1 bg-slate-950 relative overflow-hidden">
+          <canvas id="tetrisCanvas" width="300" height="600" class="block w-[210px] h-[420px] sm:w-[260px] sm:h-[520px] md:w-[290px] md:h-[580px] bg-slate-950"></canvas>
+          
+          <!-- 일시정지 / 게임오버 오버레이 -->
+          <div id="statusOverlay" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center z-20">
+            <h2 id="overlayTitle" class="text-2xl sm:text-3xl font-extrabold retro-font mb-2 text-cyan-400">PAUSED</h2>
+            <p id="overlayDesc" class="text-xs sm:text-sm text-slate-300 mb-5">게임을 계속하려면 P 또는 시작 버튼을 누르세요.</p>
+            <button id="overlayActionBtn" onclick="handleOverlayAction()" class="px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.5)] active:scale-95 transition">
+              계속하기
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 우측 패널 (NEXT 큐 3개) -->
+      <div class="flex flex-col gap-2 sm:gap-3 w-20 sm:w-28 md:w-36">
+        <div class="neon-panel rounded-xl p-2 sm:p-3 flex flex-col items-center">
+          <span class="text-[10px] sm:text-xs font-bold tracking-widest text-cyan-300/80 mb-2">NEXT</span>
+          <canvas id="nextCanvas" width="96" height="260" class="w-16 h-44 sm:w-20 sm:h-52 md:w-24 md:h-64 bg-slate-950/60 rounded-lg border border-slate-800"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="w-full max-w-lg mt-1 mb-2 px-3">
+    <!-- 모바일 컨트롤 패드 -->
+    <div class="grid grid-cols-5 gap-2">
+      <!-- 1열: 좌측 이동 -->
+      <button id="btnLeft" class="ctrl-btn h-12 sm:h-14 rounded-xl flex items-center justify-center text-xl text-slate-200">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      
+      <!-- 2열: 소프트 드롭 (아래) -->
+      <button id="btnDown" class="ctrl-btn h-12 sm:h-14 rounded-xl flex items-center justify-center text-xl text-slate-200">
+        <i class="fa-solid fa-chevron-down"></i>
+      </button>
+
+      <!-- 3열: 우측 이동 -->
+      <button id="btnRight" class="ctrl-btn h-12 sm:h-14 rounded-xl flex items-center justify-center text-xl text-slate-200">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+
+      <!-- 4열: 반시계 회전 (CCW) -->
+      <button id="btnRotateCCW" class="ctrl-btn h-12 sm:h-14 rounded-xl flex flex-col items-center justify-center text-cyan-300">
+        <i class="fa-solid fa-rotate-left text-sm"></i>
+        <span class="text-[9px] font-bold mt-0.5">CCW</span>
+      </button>
+
+      <!-- 5열: 시계 회전 (CW) -->
+      <button id="btnRotateCW" class="ctrl-btn h-12 sm:h-14 rounded-xl flex flex-col items-center justify-center text-cyan-300">
+        <i class="fa-solid fa-rotate-right text-sm"></i>
+        <span class="text-[9px] font-bold mt-0.5">CW</span>
+      </button>
+    </div>
+
+    <!-- 하단 특수 액션: 하드드롭 / 홀드 -->
+    <div class="grid grid-cols-2 gap-2 mt-2">
+      <button id="btnHardDrop" class="ctrl-btn h-11 sm:h-12 rounded-xl flex items-center justify-center gap-2 bg-gradient-to-r from-red-950/40 to-amber-950/40 border border-amber-500/40 text-amber-300 font-bold text-xs tracking-wider">
+        <i class="fa-solid fa-angles-down"></i> 하드 드롭 (Space)
+      </button>
+      <button id="btnHold" class="ctrl-btn h-11 sm:h-12 rounded-xl flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-950/40 to-blue-950/40 border border-cyan-500/40 text-cyan-300 font-bold text-xs tracking-wider">
+        <i class="fa-solid fa-hand"></i> 홀드 (C / Shift)
+      </button>
+    </div>
+
+    <div class="hidden md:flex justify-between items-center text-[11px] text-slate-400 mt-2 px-1">
+      <span>조작: ←/→ 이동, ↓ 소프트 드롭, ↑/X 회전, Z 반시계, Space 즉시 낙하, C 홀드</span>
+      <span>P 일시정지 / R 재시작</span>
+    </div>
+  </footer>
+
+  <script>
+    // 오디오 합성 엔진 (외부 오디오 파일 없이 순수 Web Audio API로 구현)
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, type = 'sine', duration = 0.08, gainVal = 0.15) {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+
+          gain.gain.setValueAtTime(gainVal, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(now);
+          osc.stop(now + duration);
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+
+      move() {
+        this.playTone(320, 'sine', 0.04, 0.08);
+      }
+
+      rotate() {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.exponentialRampToValueAtTime(640, now + 0.07);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.07);
+        } catch (e) {}
+      }
+
+      hardDrop() {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(260, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.12);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        } catch (e) {}
+      }
+
+      lineClear(lines) {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          const notes = lines >= 4 ? [523.25, 659.25, 783.99, 1046.5] : [440, 554.37, 659.25];
+          notes.forEach((freq, idx) => {
+            setTimeout(() => {
+              this.playTone(freq, 'square', 0.14, 0.15);
+            }, idx * 60);
+          });
+        } catch (e) {}
+      }
+
+      hold() {
+        this.playTone(480, 'sine', 0.06, 0.1);
+      }
+
+      levelUp() {
+        if (!this.enabled) return;
+        const notes = [440, 554.37, 659.25, 880];
+        notes.forEach((n, i) => setTimeout(() => this.playTone(n, 'triangle', 0.12, 0.2), i * 70));
+      }
+
+      gameOver() {
+        if (!this.enabled) return;
+        const notes = [300, 260, 220, 160];
+        notes.forEach((n, i) => setTimeout(() => this.playTone(n, 'sawtooth', 0.2, 0.25), i * 90));
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    function toggleAudio() {
+      sound.enabled = !sound.enabled;
+      const icon = document.getElementById('soundIcon');
+      if (sound.enabled) {
+        icon.className = 'fa-solid fa-volume-high';
+      } else {
+        icon.className = 'fa-solid fa-volume-xmark text-red-400';
+      }
+    }
+  </script>
+
+  <script>
+    const COLS = 10;
+    const ROWS = 20;
+    const BLOCK_SIZE = 30; // 300x600 캔버스 기준
+
+    // 테트로미노 형태 정의 (4x4 또는 3x3 회전 행렬)
+    const TETROMINOES = {
+      I: {
+        color: '#06b6d4', // Cyan
+        glow: 'rgba(6, 182, 212, 0.8)',
+        shapes: [
+          [[0,0,0,0], [1,1,1,1], [0,0,0,0], [0,0,0,0]],
+          [[0,0,1,0], [0,0,1,0], [0,0,1,0], [0,0,1,0]],
+          [[0,0,0,0], [0,0,0,0], [1,1,1,1], [0,0,0,0]],
+          [[0,1,0,0], [0,1,0,0], [0,1,0,0], [0,1,0,0]]
+        ]
+      },
+      J: {
+        color: '#3b82f6', // Blue
+        glow: 'rgba(59, 130, 246, 0.8)',
+        shapes: [
+          [[1,0,0], [1,1,1], [0,0,0]],
+          [[0,1,1], [0,1,0], [0,1,0]],
+          [[0,0,0], [1,1,1], [0,0,1]],
+          [[0,1,0], [0,1,0], [1,1,0]]
+        ]
+      },
+      L: {
+        color: '#f97316', // Orange
+        glow: 'rgba(249, 115, 22, 0.8)',
+        shapes: [
+          [[0,0,1], [1,1,1], [0,0,0]],
+          [[0,1,0], [0,1,0], [0,1,1]],
+          [[0,0,0], [1,1,1], [1,0,0]],
+          [[1,1,0], [0,1,0], [0,1,0]]
+        ]
+      },
+      O: {
+        color: '#eab308', // Yellow
+        glow: 'rgba(234, 179, 8, 0.8)',
+        shapes: [
+          [[1,1], [1,1]],
+          [[1,1], [1,1]],
+          [[1,1], [1,1]],
+          [[1,1], [1,1]]
+        ]
+      },
+      S: {
+        color: '#10b981', // Green
+        glow: 'rgba(16, 185, 129, 0.8)',
+        shapes: [
+          [[0,1,1], [1,1,0], [0,0,0]],
+          [[0,1,0], [0,1,1], [0,0,1]],
+          [[0,0,0], [0,1,1], [1,1,0]],
+          [[1,0,0], [1,1,0], [0,1,0]]
+        ]
+      },
+      T: {
+        color: '#a855f7', // Purple
+        glow: 'rgba(168, 85, 247, 0.8)',
+        shapes: [
+          [[0,1,0], [1,1,1], [0,0,0]],
+          [[0,1,0], [0,1,1], [0,1,0]],
+          [[0,0,0], [1,1,1], [0,1,0]],
+          [[0,1,0], [1,1,0], [0,1,0]]
+        ]
+      },
+      Z: {
+        color: '#ef4444', // Red
+        glow: 'rgba(239, 68, 68, 0.8)',
+        shapes: [
+          [[1,1,0], [0,1,1], [0,0,0]],
+          [[0,0,1], [0,1,1], [0,1,0]],
+          [[0,0,0], [1,1,0], [0,1,1]],
+          [[0,1,0], [1,1,0], [1,0,0]]
+        ]
+      }
+    };
+
+    // SRS (Super Rotation System) 킥 오프셋 데이터
+    // J, L, S, T, Z 피스용 오프셋
+    const JLSTZ_KICKS = {
+      '0->1': [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
+      '1->0': [[0,0], [1,0], [1,-1], [0,2], [1,2]],
+      '1->2': [[0,0], [1,0], [1,-1], [0,2], [1,2]],
+      '2->1': [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
+      '2->3': [[0,0], [1,0], [1,1], [0,-2], [1,-2]],
+      '3->2': [[0,0], [-1,0], [-1,-1], [0,2], [-1,2]],
+      '3->0': [[0,0], [-1,0], [-1,-1], [0,2], [-1,2]],
+      '0->3': [[0,0], [1,0], [1,1], [0,-2], [1,-2]]
+    };
+
+    // I 피스용 전용 오프셋
+    const I_KICKS = {
+      '0->1': [[0,0], [-2,0], [1,0], [-2,-1], [1,2]],
+      '1->0': [[0,0], [2,0], [-1,0], [2,1], [-1,-2]],
+      '1->2': [[0,0], [-1,0], [2,0], [-1,2], [2,-1]],
+      '2->1': [[0,0], [1,0], [-2,0], [1,-2], [-2,1]],
+      '2->3': [[0,0], [2,0], [-1,0], [2,1], [-1,-2]],
+      '3->2': [[0,0], [-2,0], [1,0], [-2,-1], [1,2]],
+      '3->0': [[0,0], [1,0], [-2,0], [1,-2], [-2,1]],
+      '0->3': [[0,0], [-1,0], [2,0], [-1,2], [2,-1]]
+    };
+
+    // 7-Bag 무작위 추출기
+    class BagRandomizer {
+      constructor() {
+        this.bag = [];
+      }
+
+      next() {
+        if (this.bag.length === 0) {
+          this.bag = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+          for (let i = this.bag.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
+          }
+        }
+        return this.bag.pop();
+      }
+    }
+  </script>
+
+  <script>
+    const canvas = document.getElementById('tetrisCanvas');
+    const ctx = canvas.getContext('2d');
+    const holdCanvas = document.getElementById('holdCanvas');
+    const holdCtx = holdCanvas.getContext('2d');
+    const nextCanvas = document.getElementById('nextCanvas');
+    const nextCtx = nextCanvas.getContext('2d');
+
+    let grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    let bag = new BagRandomizer();
+
+    let currentPiece = null;
+    let nextQueue = [];
+    let holdPieceType = null;
+    let canHold = true;
+
+    let score = 0;
+    let lines = 0;
+    let level = 1;
+    let highScore = parseInt(localStorage.getItem('cyber_tetris_highscore') || '0', 10);
+
+    let isGameOver = false;
+    let isPaused = false;
+
+    // 타이밍 및 낙하 로직 제어 변수
+    let dropCounter = 0;
+    let dropInterval = 1000; // 밀리초 (레벨에 따라 감소)
+    let lastTime = 0;
+    let lockTimer = 0;
+    const LOCK_DELAY = 500; // 0.5초 락 딜레이
+    let isLocking = false;
+
+    function getDropInterval(lvl) {
+      // 레벨이 올라갈수록 점점 빨라지는 공식
+      return Math.max(50, Math.floor(1000 * Math.pow(0.85, lvl - 1)));
+    }
+
+    class Piece {
+      constructor(type) {
+        this.type = type;
+        this.color = TETROMINOES[type].color;
+        this.glow = TETROMINOES[type].glow;
+        this.rotation = 0;
+        this.matrix = TETROMINOES[type].shapes[this.rotation];
+        // 스폰 위치 중앙 정렬
+        this.x = Math.floor((COLS - this.matrix[0].length) / 2);
+        this.y = this.type === 'I' ? -1 : 0;
+      }
+
+      setRotation(newRot) {
+        this.rotation = (newRot + 4) % 4;
+        this.matrix = TETROMINOES[this.type].shapes[this.rotation];
+      }
+    }
+
+    function createPiece(type) {
+      return new Piece(type);
+    }
+
+    function spawnNextPiece() {
+      while (nextQueue.length < 4) {
+        nextQueue.push(bag.next());
+      }
+      const type = nextQueue.shift();
+      currentPiece = createPiece(type);
+      canHold = true;
+      isLocking = false;
+      lockTimer = 0;
+
+      // 스폰 즉시 충돌 시 게임 오버 판정
+      if (checkCollision(currentPiece, currentPiece.x, currentPiece.y, currentPiece.matrix)) {
+        triggerGameOver();
+      }
+      renderPreviews();
+    }
+
+    function checkCollision(piece, px, py, matrix) {
+      for (let r = 0; r < matrix.length; r++) {
+        for (let c = 0; c < matrix[r].length; c++) {
+          if (matrix[r][c]) {
+            const newX = px + c;
+            const newY = py + r;
+
+            // 벽 및 바닥 충돌
+            if (newX < 0 || newX >= COLS || newY >= ROWS) {
+              return true;
+            }
+            // 기존 고정 블록 충돌
+            if (newY >= 0 && grid[newY][newX]) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    // SRS 벽차기 회전 시도
+    function rotatePiece(dir = 1) {
+      if (!currentPiece || isGameOver || isPaused) return;
+
+      const currentRot = currentPiece.rotation;
+      const targetRot = (currentRot + dir + 4) % 4;
+      const targetMatrix = TETROMINOES[currentPiece.type].shapes[targetRot];
+      const kickKey = `${currentRot}->${targetRot}`;
+
+      let kickData = null;
+      if (currentPiece.type === 'O') {
+        // O는 회전 오프셋 없음
+        kickData = [[0, 0]];
+      } else if (currentPiece.type === 'I') {
+        kickData = I_KICKS[kickKey] || [[0, 0]];
+      } else {
+        kickData = JLSTZ_KICKS[kickKey] || [[0, 0]];
+      }
+
+      for (let i = 0; i < kickData.length; i++) {
+        const [dx, dy] = kickData[i];
+        // SRS에서 Y 양수는 테트리스 캔버스 좌표계에서 아래(-dy) 방향
+        const testX = currentPiece.x + dx;
+        const testY = currentPiece.y - dy;
+
+        if (!checkCollision(currentPiece, testX, testY, targetMatrix)) {
+          currentPiece.x = testX;
+          currentPiece.y = testY;
+          currentPiece.setRotation(targetRot);
+          sound.rotate();
+          // 회전 성공 시 바닥에 닿아있으면 락 딜레이 리셋 (Infinity Lock 방지를 위해 약간 유지)
+          if (isGrounded()) {
+            lockTimer = 0;
+          }
+          return;
+        }
+      }
+    }
+
+    function moveHorizontal(dir) {
+      if (!currentPiece || isGameOver || isPaused) return;
+      const newX = currentPiece.x + dir;
+      if (!checkCollision(currentPiece, newX, currentPiece.y, currentPiece.matrix)) {
+        currentPiece.x = newX;
+        sound.move();
+        if (isGrounded()) {
+          lockTimer = 0;
+        }
+      }
+    }
+
+    function isGrounded() {
+      if (!currentPiece) return false;
+      return checkCollision(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.matrix);
+    }
+
+    function softDrop() {
+      if (!currentPiece || isGameOver || isPaused) return;
+      if (!checkCollision(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.matrix)) {
+        currentPiece.y += 1;
+        score += 1; // 소프트 드롭 점수
+        updateUI();
+        dropCounter = 0;
+      }
+    }
+
+    function hardDrop() {
+      if (!currentPiece || isGameOver || isPaused) return;
+      let dropDistance = 0;
+      while (!checkCollision(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.matrix)) {
+        currentPiece.y += 1;
+        dropDistance++;
+      }
+      score += dropDistance * 2; // 하드 드롭 추가 점수
+      updateUI();
+      sound.hardDrop();
+      lockCurrentPiece();
+    }
+
+    function holdPiece() {
+      if (!currentPiece || !canHold || isGameOver || isPaused) return;
+      sound.hold();
+      canHold = false;
+
+      const currentType = currentPiece.type;
+      if (holdPieceType === null) {
+        holdPieceType = currentType;
+        spawnNextPiece();
+      } else {
+        const temp = holdPieceType;
+        holdPieceType = currentType;
+        currentPiece = createPiece(temp);
+      }
+      renderPreviews();
+    }
+
+    // 고스트 피스(낙하 예상 그림자 위치 계산)
+    function getGhostPosition() {
+      if (!currentPiece) return null;
+      let ghostY = currentPiece.y;
+      while (!checkCollision(currentPiece, currentPiece.x, ghostY + 1, currentPiece.matrix)) {
+        ghostY++;
+      }
+      return { x: currentPiece.x, y: ghostY };
+    }
+
+    function lockCurrentPiece() {
+      for (let r = 0; r < currentPiece.matrix.length; r++) {
+        for (let c = 0; c < currentPiece.matrix[r].length; c++) {
+          if (currentPiece.matrix[r][c]) {
+            const boardY = currentPiece.y + r;
+            const boardX = currentPiece.x + c;
+            if (boardY < 0) {
+              triggerGameOver();
+              return;
+            }
+            grid[boardY][boardX] = {
+              color: currentPiece.color,
+              glow: currentPiece.glow
+            };
+          }
+        }
+      }
+      clearLines();
+      spawnNextPiece();
+    }
+
+    function clearLines() {
+      let linesCleared = 0;
+
+      for (let r = ROWS - 1; r >= 0; r--) {
+        const isFull = grid[r].every(cell => cell !== null);
+        if (isFull) {
+          linesCleared++;
+          grid.splice(r, 1);
+          grid.unshift(Array(COLS).fill(null));
+          r++; // 밀려난 행 재검사
+        }
+      }
+
+      if (linesCleared > 0) {
+        lines += linesCleared;
+        // 오리지널 가이드라인 점수 체계
+        const lineScores = [0, 100, 300, 500, 800];
+        score += (lineScores[linesCleared] || 800) * level;
+
+        // 10줄마다 레벨업
+        const newLevel = Math.floor(lines / 10) + 1;
+        if (newLevel > level) {
+          level = newLevel;
+          sound.levelUp();
+        }
+
+        sound.lineClear(linesCleared);
+        updateUI();
+      }
+    }
+  </script>
+
+  <script>
+    function drawBlock(targetContext, x, y, size, color, isGhost = false) {
+      targetContext.save();
+      if (isGhost) {
+        // 고스트 피스는 윤곽선으로 표시
+        targetContext.strokeStyle = color;
+        targetContext.lineWidth = 1.5;
+        targetContext.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        targetContext.fillRect(x + 2, y + 2, size - 4, size - 4);
+        targetContext.strokeRect(x + 2, y + 2, size - 4, size - 4);
+      } else {
+        // 입체감 있는 사이버펑크 블록 렌더링
+        targetContext.fillStyle = color;
+        targetContext.shadowColor = color;
+        targetContext.shadowBlur = 8;
+        targetContext.fillRect(x + 1, y + 1, size - 2, size - 2);
+
+        // 상단/좌측 하이라이트
+        targetContext.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        targetContext.fillRect(x + 2, y + 2, size - 4, 3);
+        targetContext.fillRect(x + 2, y + 2, 3, size - 4);
+
+        // 하단/우측 섀도우
+        targetContext.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        targetContext.fillRect(x + 2, y + size - 5, size - 4, 3);
+        targetContext.fillRect(x + size - 5, y + 2, 3, size - 4);
+      }
+      targetContext.restore();
+    }
+
+    function renderGridLines() {
+      ctx.strokeStyle = 'rgba(30, 41, 59, 0.4)';
+      ctx.lineWidth = 1;
+
+      for (let c = 0; c <= COLS; c++) {
+        ctx.beginPath();
+        ctx.moveTo(c * BLOCK_SIZE, 0);
+        ctx.lineTo(c * BLOCK_SIZE, ROWS * BLOCK_SIZE);
+        ctx.stroke();
+      }
+
+      for (let r = 0; r <= ROWS; r++) {
+        ctx.beginPath();
+        ctx.moveTo(0, r * BLOCK_SIZE);
+        ctx.lineTo(COLS * BLOCK_SIZE, r * BLOCK_SIZE);
+        ctx.stroke();
+      }
+    }
+
+    function renderPreviews() {
+      // 1. HOLD 캔버스 렌더링
+      holdCtx.clearRect(0, 0, holdCanvas.width, holdCanvas.height);
+      if (holdPieceType) {
+        const shape = TETROMINOES[holdPieceType].shapes[0];
+        const color = canHold ? TETROMINOES[holdPieceType].color : '#64748b';
+        drawCenteredShape(holdCtx, shape, color, holdCanvas.width / 2, holdCanvas.height / 2, 20);
+      }
+
+      // 2. NEXT 큐 렌더링 (최대 3개 표시)
+      nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+      const previewCount = Math.min(3, nextQueue.length);
+      const slotHeight = nextCanvas.height / 3;
+
+      for (let i = 0; i < previewCount; i++) {
+        const type = nextQueue[i];
+        const shape = TETROMINOES[type].shapes[0];
+        const color = TETROMINOES[type].color;
+        const centerY = (i + 0.5) * slotHeight;
+        drawCenteredShape(nextCtx, shape, color, nextCanvas.width / 2, centerY, 18);
+      }
+    }
+
+    function drawCenteredShape(targetCtx, matrix, color, centerX, centerY, cellSize) {
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      
+      // 실제 블록이 존재하는 영역 바운딩 박스 계산
+      let minR = rows, maxR = -1, minC = cols, maxC = -1;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (matrix[r][c]) {
+            if (r < minR) minR = r;
+            if (r > maxR) maxR = r;
+            if (c < minC) minC = c;
+            if (c > maxC) maxC = c;
+          }
+        }
+      }
+
+      const activeWidth = (maxC - minC + 1) * cellSize;
+      const activeHeight = (maxR - minR + 1) * cellSize;
+      const startX = centerX - activeWidth / 2 - minC * cellSize;
+      const startY = centerY - activeHeight / 2 - minR * cellSize;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (matrix[r][c]) {
+            drawBlock(targetCtx, startX + c * cellSize, startY + r * cellSize, cellSize, color);
+          }
+        }
+      }
+    }
+
+    function draw() {
+      // 캔버스 초기화
+      ctx.fillStyle = '#030712';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      renderGridLines();
+
+      // 고정된 블록들 그리기
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (grid[r][c]) {
+            drawBlock(ctx, c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, grid[r][c].color);
+          }
+        }
+      }
+
+      // 고스트 피스 그리기
+      const ghost = getGhostPosition();
+      if (ghost && currentPiece) {
+        for (let r = 0; r < currentPiece.matrix.length; r++) {
+          for (let c = 0; c < currentPiece.matrix[r].length; c++) {
+            if (currentPiece.matrix[r][c]) {
+              const drawY = (ghost.y + r) * BLOCK_SIZE;
+              const drawX = (ghost.x + c) * BLOCK_SIZE;
+              if (ghost.y + r >= 0) {
+                drawBlock(ctx, drawX, drawY, BLOCK_SIZE, currentPiece.color, true);
+              }
+            }
+          }
+        }
+      }
+
+      // 현재 움직이는 피스 그리기
+      if (currentPiece) {
+        for (let r = 0; r < currentPiece.matrix.length; r++) {
+          for (let c = 0; c < currentPiece.matrix[r].length; c++) {
+            if (currentPiece.matrix[r][c]) {
+              const drawY = (currentPiece.y + r) * BLOCK_SIZE;
+              const drawX = (currentPiece.x + c) * BLOCK_SIZE;
+              if (currentPiece.y + r >= 0) {
+                drawBlock(ctx, drawX, drawY, BLOCK_SIZE, currentPiece.color);
+              }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <script>
+    function update(time = 0) {
+      const deltaTime = time - lastTime;
+      lastTime = time;
+
+      if (!isGameOver && !isPaused && currentPiece) {
+        dropInterval = getDropInterval(level);
+        dropCounter += deltaTime;
+
+        // 자유 낙하 판정
+        if (dropCounter > dropInterval) {
+          if (!checkCollision(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.matrix)) {
+            currentPiece.y += 1;
+            isLocking = false;
+            lockTimer = 0;
+          } else {
+            isLocking = true;
+          }
+          dropCounter = 0;
+        }
+
+        // 바닥 접촉 시 락 딜레이(Lock Delay) 카운트다운
+        if (isGrounded()) {
+          lockTimer += deltaTime;
+          if (lockTimer >= LOCK_DELAY) {
+            lockCurrentPiece();
+            lockTimer = 0;
+            isLocking = false;
+          }
+        } else {
+          lockTimer = 0;
+          isLocking = false;
+        }
+      }
+
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    function updateUI() {
+      document.getElementById('scoreText').textContent = score.toLocaleString();
+      document.getElementById('levelText').textContent = level;
+      document.getElementById('linesText').textContent = lines;
+
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('cyber_tetris_highscore', highScore);
+      }
+      document.getElementById('highScoreText').textContent = highScore.toLocaleString();
+    }
+
+    function triggerGameOver() {
+      isGameOver = true;
+      sound.gameOver();
+      const overlay = document.getElementById('statusOverlay');
+      const title = document.getElementById('overlayTitle');
+      const desc = document.getElementById('overlayDesc');
+      const actionBtn = document.getElementById('overlayActionBtn');
+
+      title.textContent = 'GAME OVER';
+      title.className = 'text-2xl sm:text-3xl font-extrabold retro-font mb-2 text-rose-500';
+      desc.textContent = `최종 점수: ${score.toLocaleString()}점 | 달성 레벨: ${level}`;
+      actionBtn.textContent = '다시 시작하기';
+      overlay.classList.remove('hidden');
+    }
+
+    function togglePause() {
+      if (isGameOver) return;
+      isPaused = !isPaused;
+      const overlay = document.getElementById('statusOverlay');
+      const pauseIcon = document.getElementById('pauseIcon');
+
+      if (isPaused) {
+        pauseIcon.className = 'fa-solid fa-play';
+        const title = document.getElementById('overlayTitle');
+        const desc = document.getElementById('overlayDesc');
+        const actionBtn = document.getElementById('overlayActionBtn');
+
+        title.textContent = 'PAUSED';
+        title.className = 'text-2xl sm:text-3xl font-extrabold retro-font mb-2 text-cyan-400';
+        desc.textContent = '게임이 일시정지되었습니다.';
+        actionBtn.textContent = '계속 진행하기';
+        overlay.classList.remove('hidden');
+      } else {
+        pauseIcon.className = 'fa-solid fa-pause';
+        overlay.classList.add('hidden');
+        lastTime = performance.now();
+      }
+    }
+
+    function handleOverlayAction() {
+      if (isGameOver) {
+        resetGame();
+      } else {
+        togglePause();
+      }
+    }
+
+    function resetGame() {
+      grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+      bag = new BagRandomizer();
+      nextQueue = [];
+      holdPieceType = null;
+      canHold = true;
+      score = 0;
+      lines = 0;
+      level = 1;
+      isGameOver = false;
+      isPaused = false;
+      dropCounter = 0;
+      lockTimer = 0;
+      isLocking = false;
+
+      document.getElementById('statusOverlay').classList.add('hidden');
+      document.getElementById('pauseIcon').className = 'fa-solid fa-pause';
+
+      updateUI();
+      spawnNextPiece();
+    }
+  </script>
+
+  <script>
+    // 키보드 조작 이벤트 리스너
+    window.addEventListener('keydown', (e) => {
+      // 스페이스바 및 방향키 기본 스크롤 동작 차단
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        e.preventDefault();
+      }
+
+      if (e.code === 'KeyP') {
+        togglePause();
+        return;
+      }
+      if (e.code === 'KeyR') {
+        resetGame();
+        return;
+      }
+
+      if (isPaused || isGameOver) return;
+
+      switch (e.code) {
+        case 'ArrowLeft':
+        case 'KeyA':
+          moveHorizontal(-1);
+          break;
+        case 'ArrowRight':
+        case 'KeyD':
+          moveHorizontal(1);
+          break;
+        case 'ArrowDown':
+        case 'KeyS':
+          softDrop();
+          break;
+        case 'ArrowUp':
+        case 'KeyX':
+          rotatePiece(1); // 시계 방향
+          break;
+        case 'KeyZ':
+          rotatePiece(-1); // 반시계 방향
+          break;
+        case 'Space':
+          hardDrop();
+          break;
+        case 'KeyC':
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          holdPiece();
+          break;
+      }
+    });
+
+    // 모바일 터치 버튼 이벤트 연동 헬퍼
+    function bindTouchButton(elementId, actionCallback, repeat = false) {
+      const el = document.getElementById(elementId);
+      let repeatInterval = null;
+
+      const trigger = (e) => {
+        e.preventDefault();
+        sound.init(); // 사용자 터치 제스처 시 Web Audio 활성화
+        actionCallback();
+        if (repeat && !repeatInterval) {
+          repeatInterval = setInterval(actionCallback, 110);
+        }
+      };
+
+      const clear = (e) => {
+        if (e) e.preventDefault();
+        if (repeatInterval) {
+          clearInterval(repeatInterval);
+          repeatInterval = null;
+        }
+      };
+
+      el.addEventListener('touchstart', trigger, { passive: false });
+      el.addEventListener('touchend', clear);
+      el.addEventListener('touchcancel', clear);
+      el.addEventListener('mousedown', trigger);
+      el.addEventListener('mouseup', clear);
+      el.addEventListener('mouseleave', clear);
+    }
+
+    // 터치 패드 바인딩
+    bindTouchButton('btnLeft', () => moveHorizontal(-1), true);
+    bindTouchButton('btnRight', () => moveHorizontal(1), true);
+    bindTouchButton('btnDown', () => softDrop(), true);
+    bindTouchButton('btnRotateCW', () => rotatePiece(1), false);
+    bindTouchButton('btnRotateCCW', () => rotatePiece(-1), false);
+    bindTouchButton('btnHardDrop', () => hardDrop(), false);
+    bindTouchButton('btnHold', () => holdPiece(), false);
+
+    // 초기 실행
+    window.addEventListener('load', () => {
+      document.getElementById('highScoreText').textContent = highScore.toLocaleString();
+      resetGame();
+      requestAnimationFrame(update);
+    });
+  </script>
+</body>
+</html>
